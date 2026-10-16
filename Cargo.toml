@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/app"]
+
+[workspace.package]
+version = "0.0.1-alpha"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/yoouTaro/rsnap"
+homepage = "https://yoouTaro.github.io/rsnap/"
+description = "A small Mac screenshot tool: capture, frame it on a backdrop, annotate, and it's on your clipboard."

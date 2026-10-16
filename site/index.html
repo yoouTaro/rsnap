@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>rsnap: capture, frame it, mark it up, paste it</title>
+  <meta name="description" content="A small Mac screenshot tool. ⌥⇧S, drag, put it on a backdrop, point at things, hide secrets, and ↩ copies it. Free, open source, local.">
+  <meta name="theme-color" content="#111116">
+  <meta property="og:title" content="rsnap: capture, frame it, paste it">
+  <meta property="og:description" content="A small, free Mac screenshot tool: backdrops, arrows, highlights, redaction, Khmer text, straight to your clipboard.">
+  <meta property="og:image" content="https://yoouTaro.github.io/rsnap/img/og.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:url" content="https://yoouTaro.github.io/rsnap/">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="img/icon.png">
+  <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="t-arrow" viewBox="0 0 24 24"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></symbol>
+    <symbol id="t-rect" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/></symbol>
+    <symbol id="t-highlight" viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></symbol>
+    <symbol id="t-redact" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></symbol>
+    <symbol id="t-step" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10.5 9 12 8v8"/></symbol>
+    <symbol id="t-text" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></symbol>
+    <symbol id="t-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></symbol>
+  </svg>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="bar">
+    <div class="wrap bar-inner">
+      <a class="brand" href="#top"><img src="img/icon.png" width="28" height="28" alt=""><span>rsnap</span></a>
+      <nav aria-label="Main">
+        <a class="nav-extra" href="#tools">Tools</a>
+        <a class="nav-extra" href="#privacy">Privacy</a>
+        <a href="https://github.com/yoouTaro/rsnap">GitHub</a>
+        <a class="btn btn-sm" href="#download">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap hero-copy">
+        <h1>Snap it. Frame it.<br><span class="paste">Paste it.</span></h1>
+        <p class="lead">Press <kbd>⌥</kbd><kbd>⇧</kbd><kbd>S</kbd>, drag over anything, and rsnap opens a small editor. Put it on a backdrop, point at what matters, hide what doesn't, and <kbd>↩</kbd> puts the finished image on your clipboard.</p>
+        <div class="cta">
+          <a class="btn" href="https://github.com/yoouTaro/rsnap/releases/download/v0.0.1-alpha/rsnap-0.0.1-alpha-macos-arm64.zip">Download for Mac</a>
+          <a class="btn btn-ghost" href="https://github.com/yoouTaro/rsnap">View source</a>
+        </div>
+        <p class="facts">v0.0.1-alpha · macOS 11+, Apple silicon · 5.8 MB · free, MIT</p>
+      </div>
+      <figure class="stage wrap">
+        <div class="draw" data-draw>
+          <img src="img/hero.webp" width="1336" height="886" alt="rgrip's split view framed on a violet-to-teal backdrop, with highlighted rows, a box, an arrow, numbered steps, a label and a redacted connection string, made by rsnap's renderer">
+          <canvas data-canvas aria-hidden="true"></canvas>
+        </div>
+        <figcaption><span data-hint>Go on, drag on the image: that's rsnap's arrow.</span> <button class="link" type="button" data-clear hidden>Clear</button></figcaption>
+      </figure>
+    </section>
+
+    <section class="section" id="tools">
+      <div class="wrap">
+        <h2>Seven tools, one key each.</h2>
+        <p class="section-lead">Pick a tool, drag or click. Colors are 1 to 6. Everything undoes with ⌘Z.</p>
+        <ul class="tools">
+          <li><svg><use href="#t-arrow"/></svg><b>Arrow</b><kbd>A</kbd><span>Drag from where to where.</span></li>
+          <li><svg><use href="#t-rect"/></svg><b>Box</b><kbd>R</kbd><span>A rounded outline around the thing.</span></li>
+          <li><svg><use href="#t-highlight"/></svg><b>Highlight</b><kbd>H</kbd><span>A real highlighter: text under it stays dark.</span></li>
+          <li><svg><use href="#t-redact"/></svg><b>Redact</b><kbd>B</kbd><span>Pixelates emails, tokens and names for good.</span></li>
+          <li><svg><use href="#t-step"/></svg><b>Steps</b><kbd>N</kbd><span>Numbered markers that count up as you click.</span></li>
+          <li><svg><use href="#t-text"/></svg><b>Text</b><kbd>T</kbd><span>Labels on a colored pill. Khmer is shaped properly: ចុចទីនេះ</span></li>
+          <li><svg><use href="#t-crop"/></svg><b>Crop</b><kbd>C</kbd><span>Drag the part to keep.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section backdrops">
+      <div class="wrap">
+        <h2>On a backdrop, or not.</h2>
+        <p class="section-lead">Five gradients, three plain colors, or none. Padding, rounded corners and a soft shadow are sliders. rsnap remembers what you like.</p>
+      </div>
+      <div class="strip" role="list">
+        <figure role="listitem"><img src="img/backdrop-Peach.webp" width="760" height="1100" loading="lazy" alt="rjot's notes on the Peach backdrop"><figcaption>Peach</figcaption></figure>
+        <figure role="listitem"><img src="img/backdrop-Ocean.webp" width="760" height="1100" loading="lazy" alt="On the Ocean backdrop"><figcaption>Ocean</figcaption></figure>
+        <figure role="listitem"><img src="img/backdrop-Night.webp" width="760" height="1100" loading="lazy" alt="On the Night backdrop"><figcaption>Night</figcaption></figure>
+        <figure role="listitem"><img src="img/backdrop-Paper.webp" width="760" height="1100" loading="lazy" alt="On the Paper backdrop"><figcaption>Paper</figcaption></figure>
+      </div>
+    </section>
+
+    <section class="section editor">
+      <div class="wrap">
+        <h2>What you see is what you paste.</h2>
+        <p class="section-lead">The editor shows the real render, the same pixels that land on your clipboard.</p>
+        <img class="editor-shot" src="img/editor.webp" width="1100" height="760" loading="lazy" alt="The rsnap editor: tools and colors along the top, the framed shot in the middle, backdrop, padding, corners and shadow on the right">
+      </div>
+    </section>
+
+    <section class="section" id="privacy">
+      <div class="wrap split">
+        <div>
+          <h2>It stays on your Mac.</h2>
+          <p class="section-lead">One permission, no account, no upload.</p>
+        </div>
+        <dl class="sheet">
+          <div><dt>Needs</dt><dd>Screen Recording, so macOS lets it see what you capture. Not Accessibility: the shortcut is a plain system hotkey.</dd></div>
+          <div><dt>Keeps</dt><dd>Nothing, unless you save. Shots go to your clipboard, or to a PNG you name.</dd></div>
+          <div><dt>Sends</dt><dd>Nothing on its own. It asks GitHub for a newer version only when you click the version number.</dd></div>
+          <div><dt>Runs on</dt><dd>macOS 11 or later, Apple silicon</dd></div>
+          <div><dt>Weighs</dt><dd><span class="num">5.8&nbsp;MB</span> zipped, one native binary (Rust and egui)</dd></div>
+          <div><dt>License</dt><dd>MIT, source on GitHub</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="section install" id="download">
+      <div class="wrap">
+        <h2>Three steps.</h2>
+        <ol class="steps">
+          <li><span class="n">1</span><h3>Download</h3><p>Unzip it and move rsnap.app to Applications.</p></li>
+          <li><span class="n">2</span><h3>Open it once</h3><p>It isn't notarized yet: right-click rsnap.app and choose Open, or run <code>xattr -dr com.apple.<wbr>quarantine /Applications/<wbr>rsnap.app</code>.</p></li>
+          <li><span class="n">3</span><h3>Press ⌥⇧S</h3><p>Allow Screen Recording when macOS asks, and capture away. Updates install from inside the app.</p></li>
+        </ol>
+        <div class="closing">
+          <a class="btn btn-big" href="https://github.com/yoouTaro/rsnap/releases/download/v0.0.1-alpha/rsnap-0.0.1-alpha-macos-arm64.zip">Download rsnap for Mac</a>
+          <p class="facts">Free and open source · v0.0.1-alpha · <a href="https://github.com/yoouTaro/rsnap#build">build from source</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-inner">
+      <span>rsnap · MIT · made by <a href="https://github.com/yoouTaro">yoouTaro</a></span>
+      <span>Also: <a href="https://yoouTaro.github.io/rgrip/">rgrip</a>, a Postgres client with a map · <a href="https://yoouTaro.github.io/rjot/">rjot</a>, keep the text you highlight</span>
+    </div>
+  </footer>
+
+  <script src="main.js" defer></script>
+</body>
+</html>

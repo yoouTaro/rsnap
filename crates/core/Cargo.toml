@@ -1,0 +1,19 @@
+[package]
+name = "rsnap-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[dependencies]
+tiny-skia = "0.11"
+rustybuzz = "0.20"
+ab_glyph = "0.2"
+image = { version = "0.25", default-features = false, features = ["png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+directories = "6"
+semver = "1"
+sha2 = "0.10"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls-webpki-roots"] }
