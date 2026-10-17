@@ -30,4 +30,5 @@ scene() { # name, then env assignments
 }
 
 scene editor RSNAP_DEMO_IMAGE="$shot" RSNAP_DEMO_ANNOTATE=1
+scene stickers RSNAP_DEMO_IMAGE="$shot" RSNAP_DEMO_ANNOTATE=1 RSNAP_DEMO_TOOL=E
 scene home

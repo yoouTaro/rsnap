@@ -5,5 +5,6 @@
 pub mod doc;
 pub mod render;
 pub mod settings;
+pub mod sticker;
 pub mod text;
 pub mod update;

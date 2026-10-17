@@ -47,6 +47,14 @@ pub enum Shape {
     /// A numbered marker.
     Step { at: Pt, n: u32 },
     Text { at: Pt, text: String },
+    Line { from: Pt, to: Pt },
+    Ellipse { a: Pt, b: Pt },
+    /// Freehand, in the order drawn.
+    Pen { points: Vec<Pt> },
+    /// Dims the shot except this box.
+    Spotlight { a: Pt, b: Pt },
+    /// An emoji, centered on `at`.
+    Sticker { at: Pt, emoji: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -54,15 +62,41 @@ pub struct Annotation {
     pub shape: Shape,
     /// RGBA.
     pub color: [u8; 4],
+    /// Line width, step and label size, as a multiple of the default.
+    #[serde(default = "one")]
+    pub size: f32,
 }
 
+fn one() -> f32 {
+    1.0
+}
+
+impl Annotation {
+    pub fn new(shape: Shape, color: [u8; 4]) -> Annotation {
+        Annotation { shape, color, size: 1.0 }
+    }
+}
+
+/// Stroke sizes, in toolbar order.
+pub const SIZES: [(&str, f32); 3] = [("S", 0.6), ("M", 1.0), ("L", 1.7)];
+
+/// The sticker palette, in panel order.
+pub const STICKERS: [&str; 30] = [
+    "👉", "👈", "👆", "👇", "✅", "❌", "⚠️", "❗", "❓", "💡", "👍", "👎", "👀", "🤔", "🙏",
+    "🔥", "⭐", "❤️", "🎉", "🚀", "🐛", "💯", "✨", "📌", "🆕", "😂", "😍", "😭", "🤯", "💀",
+];
+
 /// The annotation colors, in toolbar order.
-pub const COLORS: [[u8; 4]; 6] = [
+pub const COLORS: [[u8; 4]; 10] = [
     [255, 69, 58, 255],   // red
     [255, 159, 10, 255],  // orange
     [255, 214, 10, 255],  // yellow
     [48, 209, 88, 255],   // green
+    [64, 200, 224, 255],  // teal
     [10, 132, 255, 255],  // blue
+    [155, 140, 255, 255], // violet
+    [255, 55, 145, 255],  // pink
+    [255, 255, 255, 255], // white
     [28, 28, 30, 255],    // ink
 ];
 
@@ -138,8 +172,8 @@ mod tests {
     fn steps_count_up() {
         let mut d = Doc::default();
         assert_eq!(d.next_step(), 1);
-        d.annotations.push(Annotation { shape: Shape::Step { at: Pt::new(1.0, 1.0), n: 1 }, color: COLORS[0] });
-        d.annotations.push(Annotation { shape: Shape::Step { at: Pt::new(2.0, 2.0), n: 4 }, color: COLORS[0] });
+        d.annotations.push(Annotation::new(Shape::Step { at: Pt::new(1.0, 1.0), n: 1 }, COLORS[0]));
+        d.annotations.push(Annotation::new(Shape::Step { at: Pt::new(2.0, 2.0), n: 4 }, COLORS[0]));
         assert_eq!(d.next_step(), 5);
     }
 

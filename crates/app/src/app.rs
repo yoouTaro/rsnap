@@ -10,7 +10,7 @@ use eframe::egui::{
     Sense, Stroke, TextureHandle, Ui, text::LayoutJob, vec2,
 };
 use image::RgbaImage;
-use rsnap_core::doc::{Annotation, BACKDROPS, Backdrop, Bounds, COLORS, Doc, Pt, Shape};
+use rsnap_core::doc::{Annotation, BACKDROPS, Backdrop, Bounds, COLORS, Doc, Pt, SIZES, STICKERS, Shape};
 use rsnap_core::render::{self, Layout as ShotLayout};
 use rsnap_core::settings::{self, Settings};
 use rsnap_core::text::Fonts;
@@ -22,23 +22,36 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Tool {
     Arrow,
+    Line,
     Rect,
+    Ellipse,
+    Pen,
     Highlight,
     Redact,
+    Spotlight,
     Step,
     Text,
+    Sticker,
     Crop,
 }
 
-const TOOLS: [(Tool, Svg, &str, Key); 7] = [
+const TOOLS: [(Tool, Svg, &str, Key); 12] = [
     (Tool::Arrow, Svg::Arrow, "Arrow  A", Key::A),
+    (Tool::Line, Svg::Line, "Line  L", Key::L),
     (Tool::Rect, Svg::Rect, "Box  R", Key::R),
+    (Tool::Ellipse, Svg::Ellipse, "Ellipse  O", Key::O),
+    (Tool::Pen, Svg::Pen, "Pen  P", Key::P),
     (Tool::Highlight, Svg::Highlight, "Highlight  H", Key::H),
     (Tool::Redact, Svg::Redact, "Redact  B", Key::B),
+    (Tool::Spotlight, Svg::Spotlight, "Spotlight: dim the rest  F", Key::F),
     (Tool::Step, Svg::Step, "Numbered step  N", Key::N),
     (Tool::Text, Svg::Text, "Text  T", Key::T),
+    (Tool::Sticker, Svg::Sticker, "Sticker  E", Key::E),
     (Tool::Crop, Svg::Crop, "Crop  C", Key::C),
 ];
+
+const COLOR_KEYS: [Key; 10] = [Key::Num1, Key::Num2, Key::Num3, Key::Num4, Key::Num5, Key::Num6, Key::Num7, Key::Num8, Key::Num9, Key::Num0];
+const COLOR_NAMES: [&str; 10] = ["Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Violet", "Pink", "White", "Ink"];
 
 /// A screenshot being edited.
 struct Shot {
@@ -73,6 +86,10 @@ pub struct App {
     tool: Tool,
     /// A drag in progress, in source pixels.
     drag: Option<(Pt, Pt)>,
+    /// A freehand stroke in progress, in source pixels.
+    pen: Vec<Pt>,
+    /// The "any emoji" field in the sticker panel.
+    emoji_input: String,
     /// A text annotation being typed, at a source position.
     typing: Option<(Pt, String)>,
     hotkey_rx: Receiver<()>,
@@ -105,6 +122,8 @@ impl App {
             shot: None,
             tool: Tool::Arrow,
             drag: None,
+            pen: Vec::new(),
+            emoji_input: String::new(),
             typing: None,
             hotkey_rx,
             hotkey_ok,
@@ -132,6 +151,10 @@ impl App {
                 shot.doc.annotations = sample_annotations(shot.src.width() as f32, shot.src.height() as f32);
             }
         }
+        // RSNAP_DEMO_TOOL picks a tool by its key, e.g. "E" for stickers.
+        if let Some(key) = demo("RSNAP_DEMO_TOOL") {
+            app.tool = TOOLS.iter().find(|t| t.3.name().eq_ignore_ascii_case(&key)).map_or(app.tool, |t| t.0);
+        }
         app
     }
 
@@ -148,7 +171,13 @@ impl App {
         let layout = render::layout(img.width(), img.height(), &doc);
         self.shot = Some(Shot { src: Arc::new(img), doc, undo: Vec::new(), redo: Vec::new(), texture: None, shown: None, layout });
         self.drag = None;
+        self.pen.clear();
         self.typing = None;
+    }
+
+    /// A new annotation in the current color and size.
+    fn mark(&self, shape: Shape) -> Annotation {
+        Annotation { shape, color: self.settings.rgba(), size: self.settings.stroke() }
     }
 
     /// Change the doc with undo.
@@ -323,8 +352,8 @@ impl App {
         if let Some((at, text)) = self.typing.take()
             && !text.trim().is_empty()
         {
-            let color = COLORS[self.settings.color.min(COLORS.len() - 1)];
-            self.edit(|d| d.annotations.push(Annotation { shape: Shape::Text { at, text }, color }));
+            let a = self.mark(Shape::Text { at, text });
+            self.edit(|d| d.annotations.push(a));
         }
     }
 
@@ -356,11 +385,19 @@ impl App {
                 self.tool = tool;
             }
         }
-        for (i, key) in [Key::Num1, Key::Num2, Key::Num3, Key::Num4, Key::Num5, Key::Num6].into_iter().enumerate() {
+        for (i, key) in COLOR_KEYS.into_iter().enumerate() {
             if pressed(ctx, Modifiers::NONE, key) {
                 self.settings.color = i;
                 self.save_settings();
             }
+        }
+        if pressed(ctx, Modifiers::NONE, Key::OpenBracket) && self.settings.size > 0 {
+            self.settings.size -= 1;
+            self.save_settings();
+        }
+        if pressed(ctx, Modifiers::NONE, Key::CloseBracket) && self.settings.size + 1 < SIZES.len() {
+            self.settings.size += 1;
+            self.save_settings();
         }
         if pressed(ctx, Modifiers::NONE, Key::Escape) {
             self.drag = None;
@@ -381,14 +418,6 @@ impl App {
                 if tool_button(ui, svg, tip, self.tool == tool).clicked() {
                     self.commit_text();
                     self.tool = tool;
-                }
-            }
-            ui.add_space(14.0);
-            for (i, c) in COLORS.iter().enumerate() {
-                let color = Color32::from_rgb(c[0], c[1], c[2]);
-                if color_dot(ui, color, self.settings.color == i).on_hover_text(format!("Color  {}", i + 1)).clicked() {
-                    self.settings.color = i;
-                    self.save_settings();
                 }
             }
             ui.add_space(14.0);
@@ -421,6 +450,12 @@ impl App {
     fn style_panel(&mut self, ui: &mut Ui) {
         let Some(style) = self.shot.as_ref().map(|s| s.doc.style) else { return };
         ui.add_space(6.0);
+        if self.tool == Tool::Sticker {
+            self.sticker_panel(ui);
+        } else {
+            self.color_panel(ui);
+        }
+        ui.add_space(12.0);
         section(ui, "Backdrop");
         egui::Grid::new("backdrops").spacing(vec2(8.0, 8.0)).show(ui, |ui| {
             for (i, (name, b)) in BACKDROPS.iter().enumerate() {
@@ -465,6 +500,85 @@ impl App {
         }
     }
 
+    fn color_panel(&mut self, ui: &mut Ui) {
+        section(ui, "Color");
+        egui::Grid::new("colors").spacing(vec2(4.0, 2.0)).min_col_width(0.0).show(ui, |ui| {
+            for (i, c) in COLORS.iter().enumerate() {
+                let color = Color32::from_rgb(c[0], c[1], c[2]);
+                let key = if i == 9 { 0 } else { i + 1 };
+                if color_dot(ui, color, self.settings.color == i).on_hover_text(format!("{}  {key}", COLOR_NAMES[i])).clicked() {
+                    self.settings.color = i;
+                    self.save_settings();
+                }
+                if i % 5 == 4 {
+                    ui.end_row();
+                }
+            }
+        });
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            let custom = self.settings.color >= COLORS.len();
+            let mut rgb = self.settings.custom;
+            let r = ui.color_edit_button_srgb(&mut rgb).on_hover_text("Pick any color");
+            if custom {
+                ui.painter().rect_stroke(r.rect.expand(3.0), CornerRadius::same(6), Stroke::new(2.0_f32, theme::TEXT()), egui::StrokeKind::Inside);
+            }
+            if r.clicked() || r.changed() {
+                self.settings.custom = rgb;
+                self.settings.color = COLORS.len();
+                self.save_settings();
+            }
+            ui.label(RichText::new("Custom").small().color(theme::FAINT()));
+        });
+        ui.add_space(10.0);
+        section(ui, "Size  [ ]");
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            for (i, (name, _)) in SIZES.iter().enumerate() {
+                if size_button(ui, name, i, self.settings.size == i).clicked() {
+                    self.settings.size = i;
+                    self.save_settings();
+                }
+            }
+        });
+    }
+
+    fn sticker_panel(&mut self, ui: &mut Ui) {
+        section(ui, "Sticker  (click to place)");
+        egui::Grid::new("stickers").spacing(vec2(0.0, 0.0)).min_col_width(0.0).show(ui, |ui| {
+            for (i, e) in STICKERS.iter().enumerate() {
+                if sticker_button(ui, e, self.settings.sticker == *e).clicked() {
+                    self.settings.sticker = e.to_string();
+                    self.save_settings();
+                }
+                if i % 6 == 5 {
+                    ui.end_row();
+                }
+            }
+        });
+        ui.add_space(8.0);
+        let edit = egui::TextEdit::singleline(&mut self.emoji_input).hint_text("Any emoji: ⌃⌘Space").desired_width(f32::INFINITY);
+        if ui.add(edit).changed() {
+            // The last emoji typed wins, if the emoji font has it.
+            let picked = self.emoji_input.trim().to_string();
+            if !picked.is_empty() && rsnap_core::sticker::image(&picked).is_some() {
+                self.settings.sticker = picked;
+                self.save_settings();
+            }
+        }
+        ui.add_space(10.0);
+        section(ui, "Size  [ ]");
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            for (i, (name, _)) in SIZES.iter().enumerate() {
+                if size_button(ui, name, i, self.settings.size == i).clicked() {
+                    self.settings.size = i;
+                    self.save_settings();
+                }
+            }
+        });
+    }
+
     fn canvas(&mut self, ui: &mut Ui, now: f64) {
         let ctx = ui.ctx().clone();
         let fonts = self.fonts.clone();
@@ -498,25 +612,37 @@ impl App {
         if hover.is_some() {
             ctx.set_cursor_icon(match self.tool {
                 Tool::Text => egui::CursorIcon::Text,
+                Tool::Sticker => egui::CursorIcon::PointingHand,
                 _ => egui::CursorIcon::Crosshair,
             });
         }
-        let color = COLORS[self.settings.color.min(COLORS.len() - 1)];
+        let color = self.settings.rgba();
         let color32 = Color32::from_rgba_unmultiplied(color[0], color[1], color[2], 255);
+        let size = self.settings.stroke();
+        let mark = |shape: Shape| Annotation { shape, color, size };
         let mut commit: Option<Annotation> = None;
         let mut new_crop: Option<Bounds> = None;
         let mut start_text: Option<Pt> = None;
 
         match self.tool {
-            Tool::Step | Tool::Text => {
+            Tool::Step | Tool::Text | Tool::Sticker => {
                 if response.clicked()
                     && let Some(p) = response.interact_pointer_pos()
                 {
-                    if self.tool == Tool::Step {
-                        commit = Some(Annotation { shape: Shape::Step { at: to_src(p), n: shot.doc.next_step() }, color });
-                    } else {
-                        start_text = Some(to_src(p));
+                    match self.tool {
+                        Tool::Step => commit = Some(mark(Shape::Step { at: to_src(p), n: shot.doc.next_step() })),
+                        Tool::Sticker => commit = Some(mark(Shape::Sticker { at: to_src(p), emoji: self.settings.sticker.clone() })),
+                        _ => start_text = Some(to_src(p)),
                     }
+                }
+                // A faint preview of the sticker under the pointer.
+                if self.tool == Tool::Sticker
+                    && let Some(h) = hover
+                    && let Some(t) = sticker_texture(&ctx, &self.settings.sticker)
+                {
+                    let side = render::sticker_size(lay.stroke * size) * scale;
+                    painter.image(t.id(), Rect::from_center_size(h, vec2(side, side)), Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::from_white_alpha(150));
+                    ctx.request_repaint();
                 }
             }
             _ => {
@@ -524,22 +650,32 @@ impl App {
                     && let Some(p) = response.interact_pointer_pos()
                 {
                     self.drag = Some((to_src(p), to_src(p)));
+                    self.pen = vec![to_src(p)];
                 }
                 if let (Some((_, end)), Some(p)) = (&mut self.drag, response.interact_pointer_pos())
                     && response.dragged()
                 {
                     *end = to_src(p);
+                    let q = to_src(p);
+                    if self.pen.last().is_none_or(|l| ((l.x - q.x).powi(2) + (l.y - q.y).powi(2)).sqrt() * scale > 2.0) {
+                        self.pen.push(q);
+                    }
                 }
                 if response.drag_stopped()
                     && let Some((a, b)) = self.drag.take()
                 {
                     let big = (a.x - b.x).abs() * scale > 4.0 || (a.y - b.y).abs() * scale > 4.0;
-                    if big {
+                    let points = std::mem::take(&mut self.pen);
+                    if big || (self.tool == Tool::Pen && points.len() > 1) {
                         match self.tool {
-                            Tool::Arrow => commit = Some(Annotation { shape: Shape::Arrow { from: a, to: b }, color }),
-                            Tool::Rect => commit = Some(Annotation { shape: Shape::Rect { a, b }, color }),
-                            Tool::Highlight => commit = Some(Annotation { shape: Shape::Highlight { a, b }, color }),
-                            Tool::Redact => commit = Some(Annotation { shape: Shape::Redact { a, b }, color }),
+                            Tool::Arrow => commit = Some(mark(Shape::Arrow { from: a, to: b })),
+                            Tool::Line => commit = Some(mark(Shape::Line { from: a, to: b })),
+                            Tool::Rect => commit = Some(mark(Shape::Rect { a, b })),
+                            Tool::Ellipse => commit = Some(mark(Shape::Ellipse { a, b })),
+                            Tool::Pen => commit = Some(mark(Shape::Pen { points })),
+                            Tool::Highlight => commit = Some(mark(Shape::Highlight { a, b })),
+                            Tool::Redact => commit = Some(mark(Shape::Redact { a, b })),
+                            Tool::Spotlight => commit = Some(mark(Shape::Spotlight { a, b })),
                             Tool::Crop => new_crop = Some(Bounds::from_corners(a, b)),
                             _ => {}
                         }
@@ -551,11 +687,34 @@ impl App {
         // What a drag will make, drawn live over the render.
         if let Some((a, b)) = self.drag {
             let (sa, sb) = (to_screen(a), to_screen(b));
-            let width = (lay.stroke * scale).max(2.0);
+            let width = (lay.stroke * size * scale).max(1.5);
             match self.tool {
                 Tool::Arrow => {
                     painter.line_segment([sa, sb], Stroke::new(width, color32));
                     painter.circle_filled(sb, width * 1.6, color32);
+                }
+                Tool::Line => {
+                    painter.line_segment([sa, sb], Stroke::new(width, color32));
+                }
+                Tool::Ellipse => {
+                    let r = Rect::from_two_pos(sa, sb);
+                    painter.add(egui::Shape::ellipse_stroke(r.center(), r.size() / 2.0, Stroke::new(width, color32)));
+                }
+                Tool::Pen => {
+                    let points: Vec<Pos2> = self.pen.iter().map(|p| to_screen(*p)).collect();
+                    painter.add(egui::Shape::line(points, Stroke::new(width, color32)));
+                }
+                Tool::Spotlight => {
+                    let r = Rect::from_two_pos(sa, sb);
+                    let dim = Color32::from_black_alpha(110);
+                    for part in [
+                        Rect::from_min_max(rect.min, Pos2::new(rect.max.x, r.min.y)),
+                        Rect::from_min_max(Pos2::new(rect.min.x, r.max.y), rect.max),
+                        Rect::from_min_max(Pos2::new(rect.min.x, r.min.y), Pos2::new(r.min.x, r.max.y)),
+                        Rect::from_min_max(Pos2::new(r.max.x, r.min.y), Pos2::new(rect.max.x, r.max.y)),
+                    ] {
+                        painter.rect_filled(part, CornerRadius::ZERO, dim);
+                    }
                 }
                 Tool::Rect => {
                     painter.rect_stroke(Rect::from_two_pos(sa, sb), CornerRadius::same(4), Stroke::new(width, color32), egui::StrokeKind::Middle);
@@ -591,7 +750,7 @@ impl App {
         let mut cancel_text = false;
         if let Some((at, text)) = &mut self.typing {
             let pos = to_screen(*at);
-            let px = render::label_size(text, lay.stroke) * scale;
+            let px = render::label_size(text, lay.stroke * size) * scale;
             egui::Area::new(Id::new("text-annotation")).fixed_pos(pos).order(egui::Order::Foreground).show(&ctx, |ui| {
                 Frame::new()
                     .fill(color32)
@@ -666,7 +825,7 @@ impl App {
                 ui.label(RichText::new(text).small().color(theme::MUTED()));
                 ui.ctx().request_repaint_after(std::time::Duration::from_millis(500));
             } else if self.shot.is_some() {
-                ui.label(RichText::new("A arrow · R box · H highlight · B redact · N step · T text · C crop · 1-6 colors · ↩ copy").small().color(theme::FAINT()));
+                ui.label(RichText::new("Hover a tool for its key · 1–0 colors · [ ] size · ⌘Z undo · ↩ copy").small().color(theme::FAINT()));
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| match &self.update {
                 UpdateState::Available(r) => {
@@ -787,7 +946,7 @@ fn icon_button(ui: &mut Ui, svg: Svg, tip: &str, enabled: bool) -> egui::Respons
 }
 
 fn color_dot(ui: &mut Ui, color: Color32, selected: bool) -> egui::Response {
-    let (rect, r) = ui.allocate_exact_size(vec2(24.0, 30.0), Sense::click());
+    let (rect, r) = ui.allocate_exact_size(vec2(30.0, 28.0), Sense::click());
     let c = rect.center();
     if selected {
         ui.painter().circle_stroke(c, 10.0, Stroke::new(2.0_f32, theme::TEXT()));
@@ -796,6 +955,45 @@ fn color_dot(ui: &mut Ui, color: Color32, selected: bool) -> egui::Response {
     // A ring so dark ink stays visible on the dark toolbar (and white on light).
     ui.painter().circle_stroke(c, 7.0, Stroke::new(1.0_f32, theme::FAINT().gamma_multiply(0.8)));
     r
+}
+
+/// S, M or L, drawn as a dot of that size.
+fn size_button(ui: &mut Ui, name: &str, i: usize, selected: bool) -> egui::Response {
+    let (rect, r) = ui.allocate_exact_size(vec2(46.0, 28.0), Sense::click());
+    let fill = if selected { theme::ACCENT().gamma_multiply(0.22) } else if r.hovered() { theme::RAISE() } else { theme::SURFACE() };
+    ui.painter().rect_filled(rect, CornerRadius::same(7), fill);
+    let tint = if selected { theme::ACCENT() } else { theme::MUTED() };
+    ui.painter().circle_filled(Pos2::new(rect.min.x + 14.0, rect.center().y), 2.0 + i as f32 * 1.6, tint);
+    ui.painter().text(Pos2::new(rect.max.x - 12.0, rect.center().y), egui::Align2::CENTER_CENTER, name, FontId::proportional(12.0), tint);
+    r.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// An emoji's bitmap as a texture, cached per emoji.
+fn sticker_texture(ctx: &egui::Context, emoji: &str) -> Option<TextureHandle> {
+    let id = Id::new(("sticker", emoji));
+    if let Some(t) = ctx.data_mut(|d| d.get_temp::<TextureHandle>(id)) {
+        return Some(t);
+    }
+    let img = rsnap_core::sticker::image(emoji)?;
+    let small = image::imageops::resize(img.as_ref(), 96, 96, image::imageops::FilterType::Triangle);
+    let texture = ctx.load_texture(format!("sticker-{emoji}"), egui::ColorImage::from_rgba_unmultiplied([96, 96], small.as_raw()), egui::TextureOptions::LINEAR);
+    ctx.data_mut(|d| d.insert_temp(id, texture.clone()));
+    Some(texture)
+}
+
+fn sticker_button(ui: &mut Ui, emoji: &str, selected: bool) -> egui::Response {
+    let (rect, r) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::click());
+    if selected {
+        ui.painter().rect_filled(rect, CornerRadius::same(7), theme::ACCENT().gamma_multiply(0.22));
+        ui.painter().rect_stroke(rect, CornerRadius::same(7), Stroke::new(1.5_f32, theme::ACCENT()), egui::StrokeKind::Inside);
+    } else if r.hovered() {
+        ui.painter().rect_filled(rect, CornerRadius::same(7), theme::RAISE());
+    }
+    if let Some(t) = sticker_texture(ui.ctx(), emoji) {
+        let uv = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
+        ui.painter().image(t.id(), Rect::from_center_size(rect.center(), vec2(20.0, 20.0)), uv, Color32::WHITE);
+    }
+    r.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
 /// A backdrop preset as a small rounded square (diagonal gradient).
@@ -894,13 +1092,15 @@ fn civil(z: i64) -> (i64, u32, u32) {
 pub fn sample_annotations(w: f32, h: f32) -> Vec<Annotation> {
     let p = |x: f32, y: f32| Pt::new(x * w, y * h);
     vec![
-        Annotation { shape: Shape::Highlight { a: p(0.03, 0.195), b: p(0.97, 0.29) }, color: COLORS[2] },
-        Annotation { shape: Shape::Rect { a: p(0.02, 0.335), b: p(0.98, 0.47) }, color: COLORS[4] },
-        Annotation { shape: Shape::Arrow { from: p(0.62, 0.66), to: p(0.86, 0.48) }, color: COLORS[0] },
-        Annotation { shape: Shape::Step { at: p(0.94, 0.2), n: 1 }, color: COLORS[0] },
-        Annotation { shape: Shape::Step { at: p(0.94, 0.35), n: 2 }, color: COLORS[0] },
-        Annotation { shape: Shape::Text { at: p(0.2, 0.67), text: "Pinned, with its page".into() }, color: COLORS[0] },
-        Annotation { shape: Shape::Redact { a: p(0.03, 0.85), b: p(0.6, 0.93) }, color: COLORS[5] },
+        Annotation::new(Shape::Highlight { a: p(0.03, 0.195), b: p(0.97, 0.29) }, COLORS[2]),
+        Annotation::new(Shape::Rect { a: p(0.02, 0.335), b: p(0.98, 0.47) }, COLORS[5]),
+        Annotation::new(Shape::Arrow { from: p(0.62, 0.66), to: p(0.86, 0.48) }, COLORS[0]),
+        Annotation::new(Shape::Step { at: p(0.94, 0.2), n: 1 }, COLORS[0]),
+        Annotation::new(Shape::Step { at: p(0.94, 0.35), n: 2 }, COLORS[0]),
+        Annotation::new(Shape::Text { at: p(0.2, 0.67), text: "Pinned, with its page".into() }, COLORS[0]),
+        Annotation::new(Shape::Redact { a: p(0.03, 0.85), b: p(0.6, 0.93) }, COLORS[9]),
+        Annotation::new(Shape::Ellipse { a: p(0.0, 0.535), b: p(0.5, 0.635) }, COLORS[3]),
+        Annotation::new(Shape::Sticker { at: p(0.9, 0.75), emoji: "👀".into() }, COLORS[0]),
     ]
 }
 

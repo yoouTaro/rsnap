@@ -26,14 +26,19 @@ The image above was made by rsnap's own renderer.
 | Tool | Key | What it does |
 |---|---|---|
 | Arrow | A | Drag from where to where |
+| Line | L | A plain straight line |
 | Box | R | Drag a rounded outline |
+| Ellipse | O | Circle the thing |
+| Pen | P | Freehand, smoothed |
 | Highlight | H | A highlighter: text under it stays dark |
 | Redact | B | Pixelates what's underneath, for emails, tokens and names |
+| Spotlight | F | Dims everything except the box you drag |
 | Step | N | Numbered markers, counting up: 1, 2, 3 |
 | Text | T | Click, type, ↩. Khmer is shaped properly, with subscripts stacked and vowels in place |
+| Sticker | E | Click to place an emoji: 30 in the panel, or any emoji you type (⌃⌘Space) |
 | Crop | C | Drag the part to keep; ⌘Z undoes it |
 
-**1–6** pick a color. The panel on the right has **backdrops** (none, five gradients, three plain colors), **padding**, **corners** and **shadow**. rsnap remembers your style for the next shot.
+Ten colors on **1–0**, plus a custom one from the color picker. Three sizes, **S M L**, on **[** and **]**. The panel on the right has **backdrops** (none, five gradients, three plain colors), **padding**, **corners** and **shadow**. rsnap remembers your style for the next shot.
 
 | Shortcut | Action |
 |---|---|
@@ -41,6 +46,8 @@ The image above was made by rsnap's own renderer.
 | ↩ or ⌘C | Copy to the clipboard and get out of the way |
 | ⌘S | Save as PNG |
 | ⌘Z / ⇧⌘Z | Undo / redo |
+| 1–0 | Pick a color |
+| [ / ] | Smaller / bigger marks |
 | ⌘N | New capture |
 | Esc | Close the editor |
 
@@ -53,7 +60,7 @@ The image above was made by rsnap's own renderer.
   </tr>
 </table>
 
-<p align="center"><img src="docs/screenshots/editor.png" alt="The rsnap editor: tools and colors along the top, the framed shot in the middle, backdrop, padding, corners and shadow on the right" width="760"></p>
+<p align="center"><img src="docs/screenshots/editor.png" alt="The rsnap editor: twelve tools along the top, the framed shot in the middle, and colors, size, backdrop, padding, corners and shadow on the right" width="760"></p>
 
 ## Privacy
 

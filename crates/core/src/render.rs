@@ -6,8 +6,8 @@ use crate::doc::{Annotation, Backdrop, Bounds, Doc, Pt, Shape, stroke_for};
 use crate::text::{self, Fonts};
 use image::RgbaImage;
 use tiny_skia::{
-    BlendMode, Color, FillRule, GradientStop, LinearGradient, Paint, Path, PathBuilder, Pattern, Pixmap, Point,
-    SpreadMode, Stroke, Transform,
+    BlendMode, Color, FillRule, GradientStop, LineCap, LineJoin, LinearGradient, Paint, Path, PathBuilder, Pattern, Pixmap,
+    PixmapPaint, Point, SpreadMode, Stroke, Transform,
 };
 
 /// Where the shot sits in the output, so the editor can map pointer
@@ -106,6 +106,14 @@ pub fn render(src: &RgbaImage, doc: &Doc, fonts: Option<&Fonts>) -> Pixmap {
     }
 
     let at = |p: Pt| Pt::new(p.x + lay.offset_x, p.y + lay.offset_y);
+    let spots: Vec<Bounds> = doc
+        .annotations
+        .iter()
+        .filter_map(|a| if let Shape::Spotlight { a: p, b: q } = &a.shape { Some(Bounds::from_corners(at(*p), at(*q))) } else { None })
+        .collect();
+    if !spots.is_empty() {
+        spotlight(&mut out, lay.shot, radius, &spots, lay.stroke);
+    }
     // Highlights first, so marks drawn after them stay crisp.
     for a in &doc.annotations {
         if let Shape::Highlight { a: p, b: q } = &a.shape {
@@ -119,13 +127,103 @@ pub fn render(src: &RgbaImage, doc: &Doc, fonts: Option<&Fonts>) -> Pixmap {
 }
 
 fn draw(out: &mut Pixmap, a: &Annotation, at: &impl Fn(Pt) -> Pt, stroke: f32, fonts: Option<&Fonts>) {
+    let stroke = stroke * a.size.clamp(0.2, 4.0);
     match &a.shape {
         Shape::Arrow { from, to } => arrow(out, at(*from), at(*to), stroke, a.color),
         Shape::Rect { a: p, b: q } => frame(out, Bounds::from_corners(at(*p), at(*q)), stroke, a.color),
         Shape::Step { at: p, n } => step(out, at(*p), *n, stroke, a.color, fonts),
         Shape::Text { at: p, text } => label(out, at(*p), text, stroke, a.color, fonts),
-        Shape::Highlight { .. } | Shape::Redact { .. } => {}
+        Shape::Line { from, to } => line(out, at(*from), at(*to), stroke, a.color),
+        Shape::Ellipse { a: p, b: q } => ellipse(out, Bounds::from_corners(at(*p), at(*q)), stroke, a.color),
+        Shape::Pen { points } => pen(out, &points.iter().map(|p| at(*p)).collect::<Vec<_>>(), stroke, a.color),
+        Shape::Sticker { at: p, emoji } => sticker(out, at(*p), emoji, sticker_size(stroke)),
+        Shape::Highlight { .. } | Shape::Redact { .. } | Shape::Spotlight { .. } => {}
     }
+}
+
+/// A sticker's width and height in output pixels, for a stroke width
+/// (already scaled by the annotation's size).
+pub fn sticker_size(stroke: f32) -> f32 {
+    stroke * 13.0
+}
+
+/// Stroke `path` with a soft offset shadow under it.
+fn stroke_with_shadow(out: &mut Pixmap, path: &Path, stroke: f32, color: [u8; 4], round: bool) {
+    let mut line = Stroke { width: stroke, ..Stroke::default() };
+    if round {
+        line.line_cap = LineCap::Round;
+        line.line_join = LineJoin::Round;
+    }
+    out.stroke_path(path, &solid([0, 0, 0, 55]), &line, Transform::from_translate(0.0, stroke * 0.45), None);
+    out.stroke_path(path, &solid(color), &line, Transform::identity(), None);
+}
+
+fn line(out: &mut Pixmap, from: Pt, to: Pt, stroke: f32, color: [u8; 4]) {
+    let mut p = PathBuilder::new();
+    p.move_to(from.x, from.y);
+    p.line_to(to.x, to.y);
+    if let Some(path) = p.finish() {
+        stroke_with_shadow(out, &path, stroke, color, true);
+    }
+}
+
+fn ellipse(out: &mut Pixmap, b: Bounds, stroke: f32, color: [u8; 4]) {
+    if b.width() < 2.0 || b.height() < 2.0 {
+        return;
+    }
+    if let Some(path) = tiny_skia::Rect::from_ltrb(b.x0, b.y0, b.x1, b.y1).and_then(PathBuilder::from_oval) {
+        stroke_with_shadow(out, &path, stroke, color, false);
+    }
+}
+
+/// Freehand, smoothed: quadratic curves through the midpoints.
+fn pen(out: &mut Pixmap, points: &[Pt], stroke: f32, color: [u8; 4]) {
+    let Some(first) = points.first() else { return };
+    let mut p = PathBuilder::new();
+    p.move_to(first.x, first.y);
+    if points.len() == 1 {
+        p.line_to(first.x + 0.01, first.y);
+    }
+    for i in 1..points.len().saturating_sub(1) {
+        let (c, n) = (points[i], points[i + 1]);
+        p.quad_to(c.x, c.y, (c.x + n.x) / 2.0, (c.y + n.y) / 2.0);
+    }
+    if let Some(last) = points.last()
+        && points.len() > 1
+    {
+        p.line_to(last.x, last.y);
+    }
+    if let Some(path) = p.finish() {
+        stroke_with_shadow(out, &path, stroke, color, true);
+    }
+}
+
+fn sticker(out: &mut Pixmap, at: Pt, emoji: &str, size: f32) {
+    let Some(img) = crate::sticker::image(emoji) else { return };
+    let pm = to_pixmap(&img);
+    let scale = size / img.width().max(img.height()) as f32;
+    let (w, h) = (img.width() as f32 * scale, img.height() as f32 * scale);
+    let (x, y) = (at.x - w / 2.0, at.y - h / 2.0);
+    let shader = Pattern::new(pm.as_ref(), SpreadMode::Pad, tiny_skia::FilterQuality::Bicubic, 1.0, Transform::from_row(scale, 0.0, 0.0, scale, x, y));
+    if let Some(rect) = tiny_skia::Rect::from_xywh(x, y, w, h) {
+        out.fill_rect(rect, &Paint { shader, anti_alias: true, ..Paint::default() }, Transform::identity(), None);
+    }
+}
+
+/// Dim the shot everywhere except the spotlit boxes.
+fn spotlight(out: &mut Pixmap, shot: Bounds, radius: f32, spots: &[Bounds], stroke: f32) {
+    let Some(mut layer) = Pixmap::new(out.width(), out.height()) else { return };
+    if let Some(path) = rounded_rect(shot, radius) {
+        layer.fill_path(&path, &solid([0, 0, 0, 150]), FillRule::Winding, Transform::identity(), None);
+    }
+    let mut clear = solid([0, 0, 0, 255]);
+    clear.blend_mode = BlendMode::Clear;
+    for s in spots {
+        if let Some(path) = rounded_rect(*s, stroke * 1.4) {
+            layer.fill_path(&path, &clear, FillRule::Winding, Transform::identity(), None);
+        }
+    }
+    out.draw_pixmap(0, 0, layer.as_ref(), &PixmapPaint::default(), Transform::identity(), None);
 }
 
 /// Text on a colored pill, readable on any screenshot.
@@ -188,7 +286,7 @@ fn arrow(out: &mut Pixmap, from: Pt, to: Pt, stroke: f32, color: [u8; 4]) {
     tip.line_to(base.x - uy * half, base.y + ux * half);
     tip.line_to(base.x + uy * half, base.y - ux * half);
     tip.close();
-    let line = Stroke { width: stroke, line_cap: tiny_skia::LineCap::Round, ..Stroke::default() };
+    let line = Stroke { width: stroke, line_cap: LineCap::Round, ..Stroke::default() };
     let off = Transform::from_translate(0.0, stroke * 0.45);
     if let (Some(shaft), Some(tip)) = (shaft.finish(), tip.finish()) {
         out.stroke_path(&shaft, &solid([0, 0, 0, 60]), &line, off, None);
@@ -392,8 +490,8 @@ mod tests {
     fn annotations_draw_on_the_canvas() {
         let src = RgbaImage::from_pixel(300, 200, image::Rgba([255, 255, 255, 255]));
         let mut doc = Doc { style: Style { backdrop: Backdrop::None, ..Style::default() }, ..Doc::default() };
-        doc.annotations.push(Annotation { shape: Shape::Arrow { from: Pt::new(20.0, 20.0), to: Pt::new(200.0, 150.0) }, color: COLORS[0] });
-        doc.annotations.push(Annotation { shape: Shape::Rect { a: Pt::new(220.0, 20.0), b: Pt::new(280.0, 80.0) }, color: COLORS[4] });
+        doc.annotations.push(Annotation::new(Shape::Arrow { from: Pt::new(20.0, 20.0), to: Pt::new(200.0, 150.0) }, COLORS[0]));
+        doc.annotations.push(Annotation::new(Shape::Rect { a: Pt::new(220.0, 20.0), b: Pt::new(280.0, 80.0) }, COLORS[5]));
         let out = render(&src, &doc, None);
         let px = |x: u32, y: u32| out.pixel(x, y).unwrap();
         // The arrow's middle is red; the box's edge is blue; a blank spot stays white.
@@ -409,12 +507,43 @@ mod tests {
         let Some(fonts) = Fonts::system() else { return };
         let src = RgbaImage::from_pixel(400, 300, image::Rgba([255, 255, 255, 255]));
         let mut doc = Doc { style: Style { backdrop: Backdrop::None, ..Style::default() }, ..Doc::default() };
-        doc.annotations.push(Annotation { shape: Shape::Text { at: Pt::new(20.0, 20.0), text: "ចុចទីនេះ Click".into() }, color: COLORS[4] });
-        doc.annotations.push(Annotation { shape: Shape::Step { at: Pt::new(300.0, 200.0), n: 1 }, color: COLORS[0] });
+        doc.annotations.push(Annotation::new(Shape::Text { at: Pt::new(20.0, 20.0), text: "ចុចទីនេះ Click".into() }, COLORS[5]));
+        doc.annotations.push(Annotation::new(Shape::Step { at: Pt::new(300.0, 200.0), n: 1 }, COLORS[0]));
         let out = render(&src, &doc, Some(&fonts));
         assert!(out.pixel(30, 30).unwrap().red() < 100, "pill is blue");
         let step = out.pixel(300 - 8, 200 - 8).unwrap();
         assert!(step.red() > 200, "step is red: {step:?}");
         assert!(to_png(&out).unwrap().starts_with(&[0x89, b'P', b'N', b'G']));
+    }
+
+    #[test]
+    fn new_tools_draw() {
+        let src = RgbaImage::from_pixel(400, 300, image::Rgba([255, 255, 255, 255]));
+        let mut doc = Doc { style: Style { backdrop: Backdrop::None, ..Style::default() }, ..Doc::default() };
+        doc.annotations.push(Annotation::new(Shape::Line { from: Pt::new(10.0, 290.0), to: Pt::new(390.0, 290.0) }, COLORS[3]));
+        doc.annotations.push(Annotation::new(Shape::Ellipse { a: Pt::new(20.0, 20.0), b: Pt::new(120.0, 100.0) }, COLORS[5]));
+        let pen: Vec<Pt> = (0..20).map(|i| Pt::new(200.0 + i as f32 * 8.0, 40.0 + (i as f32 * 0.6).sin() * 20.0)).collect();
+        doc.annotations.push(Annotation::new(Shape::Pen { points: pen }, COLORS[7]));
+        doc.annotations.push(Annotation::new(Shape::Spotlight { a: Pt::new(150.0, 150.0), b: Pt::new(250.0, 250.0) }, COLORS[0]));
+        let out = render(&src, &doc, None);
+        let px = |x: u32, y: u32| out.pixel(x, y).unwrap();
+        assert!(px(200, 290).green() > 150 && px(200, 290).red() < 120, "green line");
+        assert!(px(70, 20).blue() > 200 && px(70, 20).red() < 120, "blue ellipse top");
+        assert_eq!(px(200, 200).red(), 255, "inside the spotlight stays bright");
+        assert!(px(380, 150).red() < 150, "outside it is dimmed");
+    }
+
+    #[test]
+    fn stickers_draw() {
+        if crate::sticker::image("✅").is_none() {
+            return;
+        }
+        let src = RgbaImage::from_pixel(300, 300, image::Rgba([255, 255, 255, 255]));
+        let mut doc = Doc { style: Style { backdrop: Backdrop::None, ..Style::default() }, ..Doc::default() };
+        doc.annotations.push(Annotation::new(Shape::Sticker { at: Pt::new(150.0, 150.0), emoji: "✅".into() }, COLORS[0]));
+        let out = render(&src, &doc, None);
+        // The ✅ tile is green; its middle is the white tick, so look near a corner.
+        let c = out.pixel(136, 136).unwrap();
+        assert!(c.green() as i32 > c.red() as i32 + 40, "a green tile: {c:?}");
     }
 }

@@ -2976,7 +2976,7 @@ dependencies = [
 
 [[package]]
 name = "rsnap"
-version = "0.0.1-alpha"
+version = "0.0.2-alpha"
 dependencies = [
  "ab_glyph",
  "eframe",
@@ -2994,11 +2994,12 @@ dependencies = [
 
 [[package]]
 name = "rsnap-core"
-version = "0.0.1-alpha"
+version = "0.0.2-alpha"
 dependencies = [
  "ab_glyph",
  "directories",
  "image",
+ "memmap2",
  "reqwest",
  "rustybuzz",
  "semver",

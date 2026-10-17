@@ -13,6 +13,11 @@ pub enum Svg {
     Step,
     Text,
     Crop,
+    Line,
+    Ellipse,
+    Pen,
+    Spotlight,
+    Sticker,
     Undo,
     Redo,
     Copy,
@@ -30,6 +35,11 @@ impl Svg {
             Svg::Step => r#"<circle cx="12" cy="12" r="9"/><path d="M10.5 9 12 8v8"/>"#,
             Svg::Text => r#"<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/>"#,
             Svg::Crop => r#"<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>"#,
+            Svg::Line => r#"<path d="M5 19 19 5"/>"#,
+            Svg::Ellipse => r#"<ellipse cx="12" cy="12" rx="10" ry="7"/>"#,
+            Svg::Pen => r#"<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>"#,
+            Svg::Spotlight => r#"<circle cx="12" cy="12" r="3"/><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>"#,
+            Svg::Sticker => r#"<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/>"#,
             Svg::Undo => r#"<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/>"#,
             Svg::Redo => r#"<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/>"#,
             Svg::Copy => r#"<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>"#,
@@ -86,7 +96,7 @@ mod tests {
 
     #[test]
     fn icons_rasterize() {
-        for svg in [Svg::Arrow, Svg::Rect, Svg::Highlight, Svg::Redact, Svg::Step, Svg::Text, Svg::Crop, Svg::Undo, Svg::Redo, Svg::Copy, Svg::Save, Svg::Camera] {
+        for svg in [Svg::Arrow, Svg::Rect, Svg::Highlight, Svg::Redact, Svg::Step, Svg::Text, Svg::Crop, Svg::Line, Svg::Ellipse, Svg::Pen, Svg::Spotlight, Svg::Sticker, Svg::Undo, Svg::Redo, Svg::Copy, Svg::Save, Svg::Camera] {
             let img = rasterize(svg, 32).expect("valid svg");
             assert!(img.pixels.iter().any(|p| p.a() > 200), "{svg:?} drew something");
         }
