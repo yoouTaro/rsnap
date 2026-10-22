@@ -51,11 +51,9 @@
       <div class="wrap hero-copy">
         <h1>Snap it. Frame it.<br><span class="paste">Paste it.</span></h1>
         <p class="lead">Press <kbd>⌥</kbd><kbd>⇧</kbd><kbd>S</kbd>, drag over anything, and rsnap opens a small editor. Put it on a backdrop, point at what matters, hide what doesn't, and <kbd>↩</kbd> puts the finished image on your clipboard.</p>
-        <div class="cta">
-          <a class="btn" href="https://github.com/yoouTaro/rsnap/releases/download/v0.0.2-alpha/rsnap-0.0.2-alpha-macos-arm64.zip">Download for Mac</a>
-          <a class="btn btn-ghost" href="https://github.com/yoouTaro/rsnap">View source</a>
-        </div>
-        <p class="facts">v0.0.2-alpha · macOS 11+, Apple silicon · 5.9 MB · free, MIT</p>
+        <div class="cmd cmd-hero"><code data-cmd>curl -fsSL https://raw.githubusercontent.com/yoouTaro/rsnap/main/install.sh | sh</code><button class="copy" type="button" data-copy aria-label="Copy the install command"><svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><rect width="13" height="13" x="9" y="9" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="i-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></div>
+        <p class="facts">Paste it in Terminal · or <a href="https://github.com/yoouTaro/rsnap/releases">download the zip</a> · <a href="https://github.com/yoouTaro/rsnap">view source</a></p>
+        <p class="facts">macOS 11+, Apple silicon · about 6 MB · free, MIT</p>
       </div>
       <figure class="stage wrap">
         <div class="draw" data-draw>
@@ -127,15 +125,16 @@
 
     <section class="section install" id="download">
       <div class="wrap">
-        <h2>Three steps.</h2>
+        <h2>Two steps.</h2>
         <ol class="steps">
-          <li><span class="n">1</span><h3>Download</h3><p>Unzip it and move rsnap.app to Applications.</p></li>
-          <li><span class="n">2</span><h3>Open it once</h3><p>It isn't notarized yet: right-click rsnap.app and choose Open, or run <code>xattr -dr com.apple.<wbr>quarantine /Applications/<wbr>rsnap.app</code>.</p></li>
-          <li><span class="n">3</span><h3>Press ⌥⇧S</h3><p>Allow Screen Recording when macOS asks, and capture away. Updates install from inside the app.</p></li>
+          <li><span class="n">1</span><h3>Install</h3><p>Paste this in Terminal. It downloads the latest release, checks its SHA-256, puts rsnap.app in Applications, clears the quarantine flag and opens it. Run it again to update.</p>
+          <div class="cmd"><code data-cmd>curl -fsSL https://raw.githubusercontent.com/yoouTaro/rsnap/main/install.sh | sh</code><button class="copy" type="button" data-copy aria-label="Copy the install command"><svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><rect width="13" height="13" x="9" y="9" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="i-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></div></li>
+          <li><span class="n">2</span><h3>Press ⌥⇧S</h3><p>Allow Screen Recording when macOS asks, and capture away. Updates also install from inside the app.</p></li>
         </ol>
         <div class="closing">
-          <a class="btn btn-big" href="https://github.com/yoouTaro/rsnap/releases/download/v0.0.2-alpha/rsnap-0.0.2-alpha-macos-arm64.zip">Download rsnap for Mac</a>
-          <p class="facts">Free and open source · v0.0.2-alpha · <a href="https://github.com/yoouTaro/rsnap#build">build from source</a></p>
+          <p class="alt">Or download the zip. It isn't notarized yet, so the first time, right-click rsnap.app and choose Open.</p>
+          <a class="btn btn-ghost" href="https://github.com/yoouTaro/rsnap/releases">Download rsnap for Mac</a>
+          <p class="facts">Free and open source · <a href="https://github.com/yoouTaro/rsnap#build">build from source</a></p>
         </div>
       </div>
     </section>

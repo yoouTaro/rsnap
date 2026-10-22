@@ -94,10 +94,26 @@ nav a:not(.btn):hover { color: var(--text); }
 .sheet dt { font-weight: 620; }
 .sheet dd { margin: 0; color: var(--muted); }
 
-.steps { list-style: none; padding: 0; margin: 48px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; }
+.steps { list-style: none; padding: 0; margin: 48px 0 0; display: grid; grid-template-columns: 1.6fr 1fr; gap: 48px; align-items: start; }
 .steps .n { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--red); color: #fff; font-weight: 700; box-shadow: 0 0 0 3px #fff; margin-bottom: 18px; }
 .steps p { color: var(--muted); margin: 8px 0 0; font-size: 15.5px; }
-.closing { margin-top: 96px; text-align: center; }
+.closing { margin-top: 80px; text-align: center; }
+.alt { color: var(--muted); max-width: 32em; margin: 0 auto 20px; font-size: 15.5px; }
+
+/* ---- Command block: scrolls inside, never widens the page ---- */
+.cmd { display: flex; align-items: stretch; min-width: 0; max-width: 100%; margin-top: 16px; background: var(--raise); border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; text-align: left; }
+.cmd code { flex: 1; min-width: 0; padding: 14px 16px; background: none; border-radius: 0; font-size: 13.5px; line-height: 1.5; white-space: nowrap; overflow-x: auto; scrollbar-width: thin; user-select: all; }
+.cmd code::before { content: "$ "; color: var(--faint); }
+.copy { flex: none; width: 48px; display: grid; place-items: center; background: var(--raise-2); color: var(--muted); border: 0; border-left: 1px solid var(--line-2); cursor: pointer; }
+.copy:hover { color: var(--text); }
+.copy svg { grid-area: 1 / 1; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.copy .i-ok { display: none; }
+.copy.done { color: var(--dusk-b); }
+.copy.done .i-copy { display: none; }
+.copy.done .i-ok { display: block; }
+.cmd-hero { max-width: 780px; margin: 0 auto; }
+.cmd-hero + .facts { margin-top: 18px; }
+.facts a { color: var(--muted); }
 
 .foot { border-top: 1px solid var(--line); padding: 28px 0 44px; color: var(--faint); font-size: 14px; }
 .foot-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -113,5 +129,6 @@ nav a:not(.btn):hover { color: var(--text); }
   .nav-extra { display: none; }
   .hero { padding-top: 48px; }
   .sheet > div { grid-template-columns: 1fr; gap: 4px; }
+  .steps > li { min-width: 0; }
   .strip { grid-auto-columns: 72%; padding: 0 20px; }
 }

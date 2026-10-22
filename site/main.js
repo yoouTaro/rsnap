@@ -1,3 +1,18 @@
+// Copy buttons: every .cmd block copies its <code> text.
+for (const btn of document.querySelectorAll("[data-copy]")) {
+  btn.addEventListener("click", async () => {
+    const text = btn.parentElement.querySelector("[data-cmd]").textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      return;
+    }
+    btn.classList.add("done");
+    clearTimeout(btn.timer);
+    btn.timer = setTimeout(() => btn.classList.remove("done"), 1500);
+  });
+}
+
 // Draw rsnap's arrow on the hero image: drag from where to where. The
 // arrow matches the app's (round shaft, filled head, soft drop shadow).
 
