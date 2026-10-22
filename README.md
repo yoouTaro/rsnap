@@ -68,9 +68,15 @@ rsnap needs one permission, **Screen Recording**, so macOS lets it see what you 
 
 ## Install
 
-Download the zip from [Releases](https://github.com/yoouTaro/rsnap/releases), unzip it, and move **rsnap.app** to your Applications folder. It's for Apple silicon. On other Macs, build from source.
+Run this in Terminal (Apple silicon):
 
-It isn't notarized, so macOS blocks the first launch. Right-click **rsnap.app** and choose **Open**, or run:
+```sh
+curl -fsSL https://raw.githubusercontent.com/yoouTaro/rsnap/main/install.sh | sh
+```
+
+It downloads the latest release, checks its SHA-256, puts **rsnap.app** in Applications and opens it. Run it again to update.
+
+Or download the zip from [Releases](https://github.com/yoouTaro/rsnap/releases), unzip it and move **rsnap.app** to Applications. It isn't notarized, so macOS blocks the first launch of a downloaded zip: right-click **rsnap.app** and choose **Open**, or run:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/rsnap.app
